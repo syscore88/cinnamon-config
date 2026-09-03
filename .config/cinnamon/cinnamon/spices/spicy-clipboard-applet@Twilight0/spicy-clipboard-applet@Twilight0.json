@@ -1,0 +1,108 @@
+{
+    "main-section": {
+        "type": "section",
+        "description": "General Settings"
+    },
+    "historySize": {
+        "type": "spinbutton",
+        "default": 20,
+        "min": 5,
+        "max": 100,
+        "step": 1,
+        "units": "items",
+        "description": "Clipboard History Size",
+        "tooltip": "Number of copied items to store in history.",
+        "value": 20
+    },
+    "autoPaste": {
+        "type": "checkbox",
+        "default": true,
+        "description": "Auto-Paste on Selection",
+        "tooltip": "Automatically paste the selected item into the active window when clicked.",
+        "value": true
+    },
+    "pasteTool": {
+        "type": "combobox",
+        "default": "xdotool",
+        "options": {
+            "xdotool (X11)": "xdotool",
+            "dotool (Wayland)": "dotool",
+            "None (Copy Only)": "none"
+        },
+        "description": "Input Simulation Tool",
+        "tooltip": "Select the tool used to simulate the Ctrl+V paste shortcut.",
+        "value": "xdotool"
+    },
+    "notifyOnCopy": {
+        "type": "checkbox",
+        "default": false,
+        "description": "Notification on Copy",
+        "tooltip": "Show a desktop notification when a new item is captured.",
+        "value": false
+    },
+    "menuMaxHeight": {
+        "type": "spinbutton",
+        "default": 350,
+        "min": 150,
+        "max": 800,
+        "step": 25,
+        "units": "pixels",
+        "description": "Menu Max Height",
+        "tooltip": "The maximum height (in pixels) of the clipboard history dropdown list before it starts scrolling.",
+        "value": 350
+    },
+    "mouse-section": {
+        "type": "section",
+        "description": "Mouse Clicks Configuration"
+    },
+    "leftClickAction": {
+        "type": "combobox",
+        "default": "select",
+        "options": {
+            "Select (Copy/Paste)": "select",
+            "Edit Item": "edit",
+            "Delete Item": "delete",
+            "None": "none"
+        },
+        "description": "Left-Click Action",
+        "tooltip": "Action performed when left-clicking a history item.",
+        "value": "select"
+    },
+    "middleClickAction": {
+        "type": "combobox",
+        "default": "edit",
+        "options": {
+            "Select (Copy/Paste)": "select",
+            "Edit Item": "edit",
+            "Delete Item": "delete",
+            "None": "none"
+        },
+        "description": "Middle-Click Action",
+        "tooltip": "Action performed when middle-clicking a history item.",
+        "value": "edit"
+    },
+    "rightClickAction": {
+        "type": "combobox",
+        "default": "delete",
+        "options": {
+            "Select (Copy/Paste)": "select",
+            "Edit Item": "edit",
+            "Delete Item": "delete",
+            "None": "none"
+        },
+        "description": "Right-Click Action",
+        "tooltip": "Action performed when right-clicking a history item.",
+        "value": "delete"
+    },
+    "history-manager-section": {
+        "type": "section",
+        "description": "History Manager"
+    },
+    "editHistoryButton": {
+        "type": "button",
+        "description": "Edit History Items (YAD)",
+        "tooltip": "Click to launch a dialog allowing you to view and edit any text item in the history.",
+        "callback": "launchHistoryManager"
+    },
+    "__md5__": "71909b0a64b23bf7c766dc7fc1fc7497"
+}
