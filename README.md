@@ -79,8 +79,7 @@ chmod +x install.sh
 ```bash
 ./install.sh
 ```
-
-<img width="1280" height="800" alt="Screenshot_ubuntu25 10_2026-07-20_18:52:25" src="https://github.com/user-attachments/assets/a46bc512-b785-4917-927d-43d62822830c" />
+<img width="1280" height="800" alt="Screenshot_debian13_2026-09-03_21:55:25" src="https://github.com/user-attachments/assets/41f23ae9-a5ba-4660-9378-6cc374b68f8f" />
 
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/bartekszczecinski)
 
