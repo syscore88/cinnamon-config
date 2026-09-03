@@ -167,19 +167,19 @@ detect_os() {
 install_cinnamon_packages() {
     if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
-        for pkg in cinnamon-settings cinnamon-control-center; do
+        for pkg in cinnamon-settings cinnamon-control-center dconf-cli; do
             sudo apt-get install -yq "$pkg" || true
         done
     elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-        for pkg in cinnamon-settings cinnamon-control-center; do
+        for pkg in cinnamon-settings cinnamon-control-center dconf; do
             sudo dnf install -yq "$pkg" || true
         done
     elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
-        for pkg in cinnamon-control-center; do
+        for pkg in cinnamon-control-center dconf; do
             sudo pacman -S --noconfirm --needed "$pkg" || true
         done
     elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
-        for pkg in cinnamon-settings cinnamon-control-center; do
+        for pkg in cinnamon-settings cinnamon-control-center dconf; do
             sudo zypper install -yqn "$pkg" || true
         done
     fi
