@@ -65,11 +65,11 @@ The temporary sudo/polkit rule is removed and the system automatically **reboots
 
 ---
 
- 🛠️ How to Use
+🚀 How to Run
 
  1. Clone the repository or download the files
 ```bash
-git clone https://gitlab.com/syscore88/cinnamon-config.git
+git clone https://github.com/syscore88/cinnamon-config.git
 ```
 
 2. Enter the downloaded folder
