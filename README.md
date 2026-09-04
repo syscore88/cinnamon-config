@@ -103,5 +103,6 @@ If you find this project useful, leave a star! ⭐
 ---
 
 ## ⚠️ Troubleshooting and Notes
+
 - **System restart**: The script includes a `systemctl reboot` command at the very end to ensure that all visual changes, permissions, and session variables are properly applied. **Save your work before running!**
 - **Add-ons (Spices) not activating automatically?** If downloaded applets or extensions do not appear immediately, open *Cinnamon Settings* > *Applets/Extensions* and make sure they are enabled.
