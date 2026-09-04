@@ -88,6 +88,8 @@ chmod +x install.sh
 ```bash
 ./install.sh
 ```
+---
+
 <img width="1280" height="800" alt="Screenshot_debian13_2026-09-03_21:55:25" src="https://github.com/user-attachments/assets/41f23ae9-a5ba-4660-9378-6cc374b68f8f" />
 
 ### ☕ Support the Project
@@ -98,7 +100,8 @@ If you find this tool helpful and it saved you some time, consider buying me a c
 
 If you find this project useful, leave a star! ⭐
 
-## ⚠️ Troubleshooting and Notes
+---
 
+## ⚠️ Troubleshooting and Notes
 - **System restart**: The script includes a `systemctl reboot` command at the very end to ensure that all visual changes, permissions, and session variables are properly applied. **Save your work before running!**
 - **Add-ons (Spices) not activating automatically?** If downloaded applets or extensions do not appear immediately, open *Cinnamon Settings* > *Applets/Extensions* and make sure they are enabled.
