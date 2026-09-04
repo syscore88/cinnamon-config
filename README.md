@@ -90,6 +90,10 @@ chmod +x install.sh
 ```
 <img width="1280" height="800" alt="Screenshot_debian13_2026-09-03_21:55:25" src="https://github.com/user-attachments/assets/41f23ae9-a5ba-4660-9378-6cc374b68f8f" />
 
+### ☕ Support the Project
+
+If you find this tool helpful and it saved you some time, consider buying me a coffee to support further development! 
+
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/bartekszczecinski)
 
 If you find this project useful, leave a star! ⭐
