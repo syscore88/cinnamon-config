@@ -1,58 +1,67 @@
-# 🎨 Cinnamon Visual Configuration Script
+# 🌿 Cinnamon Visual Configuration Script
 
-An automated Bash shell script designed for full visual and environmental configuration of the **Cinnamon** desktop environment on popular Linux distributions. The script automatically detects the system package manager, installs required configuration tools, copies user settings (`.config`, `.local`, `.icons`), sets wallpapers (desktop and LightDM/Slick-Greeter login screen), loads `dconf` settings, and automatically downloads and installs extensions and applets (Cinnamon Spices).
+An automated Bash shell script designed for complete visual and environment configuration of the **Cinnamon** desktop across popular Linux distributions. The script automatically detects the system package manager, installs required Cinnamon utility packages, downloads Cinnamon Spices applets/extensions, copies user configurations, sets the desktop wallpaper, loads `dconf` settings, sets the user avatar, and configures the LightDM/Slick-Greeter login screen wallpaper.
+
+The script auto-detects the system language (Polish/English) from the `LANG`/`LC_ALL` locale and prints all status messages accordingly.
 
 ---
 
-## 🚀 Main Features
+## 🚀 Script Features
 
-- **Automatic distribution detection**: Full support for Debian, Ubuntu, Fedora, Arch Linux, openSUSE, and their derivatives.
-- **Cinnamon tools installation**: The script automatically installs `cinnamon-settings`, `cinnamon-control-center`, and necessary dependencies (`curl`, `unzip`).
-- **Configuration files synchronization**:
-  - Copies the contents of the `.config/`, `.local/`, and `.icons/` folders to the user's home directory.
-- **Wallpaper management**:
-  - Sets the desktop wallpaper from the `wallpaper.jpg` file.
-  - Configures the **LightDM / Slick-Greeter** login screen background using the `login-wallpaper.png` file.
-- **dconf settings import**: Automatically loads exported user preferences from the `dconf-settings.ini` file directly into the dconf database.
-- **Cinnamon Spices management**: Downloads and extracts selected applets and extensions directly from Linux Mint servers:
-  - **Applets**: *Download/Upload Speed* (`download-and-upload-speed@cardsurf`), *ScreenShot* (`ScreenShot@tech71`), *Sticky Notes* (`sticky@scollins`), *Weather* (`weather@mockturtl`).
-  - **Extensions**: *Burn My Windows* (`CinnamonBurnMyWindows@klangman`), *Compiz Windows Effect* (`compiz-windows-effect@hermes83.github.com`), *Transparent Panels* (`transparent-panels@germanfr`).
-- **User Avatar**: Automatically sets the user's profile picture in AccountsService using the `piwo.png` file.
-- **Multilingualism**: Displays clear progress bars in Polish or English depending on the system's regional settings.
+- **Automatic Linux Distribution Detection**: Support for Debian/Ubuntu-based, Fedora-based, Arch/Manjaro-based, and openSUSE/SUSE-based systems, detected via `/etc/os-release`.
+- **Temporary Passwordless Sudo**: Requests the admin password once at the start, then configures a temporary `NOPASSWD` rule (via `/etc/sudoers.d/`, or a `polkit`/`run0` rule on systems without `visudo`) so the rest of the script can run unattended. The rule is automatically removed at the end of the script.
+- **Cinnamon Tools Installation**: Installs `cinnamon-settings`, `cinnamon-control-center`, and `dconf`/`dconf-cli` depending on the distribution.
+- **Cinnamon Spices (Applets & Extensions)**: Downloads and installs selected items directly from `cinnamon-spices.linuxmint.com` into `~/.local/share/cinnamon/`:
+  - **Applets**: *Download & Upload Speed* (`download-and-upload-speed@cardsurf`), *ScreenShot* (`ScreenShot@tech71`), *Sticky Notes* (`sticky@scollins`), *Weather* (`weather@mockturtl`)
+  - **Extensions**: *Burn My Windows* (`CinnamonBurnMyWindows@klangman`), *Compiz Windows Effect* (`compiz-windows-effect@hermes83.github.com`), *Transparent Panels* (`transparent-panels@germanfr`)
+- **Configuration Files Sync**:
+  - Copies `.config/`, `.local/`, `.icons/`, and `.themes/` folder contents into the corresponding folders in the user's home directory.
+- **Wallpaper Management**:
+  - Desktop wallpaper copied from `wallpaper.jpg` into the user's Pictures folder (`xdg-user-dir PICTURES`) and applied via `gsettings` (`org.cinnamon.desktop.background`).
+  - Login screen wallpaper applied from `login-wallpaper.png` for LightDM's Slick Greeter, via `/etc/lightdm/slick-greeter.conf`.
+- **Import dconf Settings**: Loads a full set of Cinnamon, GTK, Nemo, GNOME Terminal, and xed/xapp preferences directly into the user's `dconf` database via `dconf load /`.
+- **User Avatar Setup**: Automatically sets the user profile picture in `AccountsService` using `piwo.png`.
+- **Progress Bar & Logging**: Displays a live progress bar across 5 phases / 12 steps. On failure, a detailed log is saved to `~/install_error_<timestamp>.log`.
 
 ---
 
 ## 🐧 Supported Distributions
 
-The script identifies the system using `/etc/os-release` and selects the appropriate package manager:
+The script identifies the OS using `/etc/os-release` (`ID` / `ID_LIKE`) and selects the corresponding package manager:
 
 | Distribution | Package Manager | Installed Packages |
 | :--- | :--- | :--- |
-| **Debian / Ubuntu / Mint** | `apt` | `cinnamon-settings`, `cinnamon-control-center`, `curl`, `unzip` |
-| **Fedora** | `dnf` | `cinnamon-settings`, `cinnamon-control-center`, `curl`, `unzip` |
-| **Arch Linux / Manjaro** | `pacman` | `cinnamon-control-center`, `curl`, `unzip` |
-| **openSUSE** | `zypper` | `cinnamon-settings`, `cinnamon-control-center`, `curl`, `unzip` |
+| **Debian / Ubuntu** and derivatives | `apt` | `cinnamon-settings`, `cinnamon-control-center`, `dconf-cli` |
+| **Fedora** and derivatives | `dnf` | `cinnamon-settings`, `cinnamon-control-center`, `dconf` |
+| **Arch Linux / Manjaro** | `pacman` | `cinnamon-control-center`, `dconf` |
+| **openSUSE / SUSE** | `zypper` | `cinnamon-settings`, `cinnamon-control-center`, `dconf` |
+
+`curl` and `unzip` are additionally installed on all distributions as dependencies for downloading Cinnamon Spices.
 
 ---
 
 ## 🔍 Module Details
 
-### 1. Configuration Copying
-Copies the contents of local configuration files (`.config`, `.local`, `.icons`) to the user's home directory, preserving the directory structure and permissions.
+### 1. Permissions & Distribution Detection
+Verifies the script is **not** run as root, requests the sudo password once, and grants a temporary `NOPASSWD` rule for the duration of the run (via sudoers, or a `polkit`/`run0` rule on systems that lack `visudo`).
 
-### 2. Desktop and Login Wallpapers
-- The desktop wallpaper is copied to the `Pictures` directory (detected by `xdg-user-dir PICTURES`) and set using `gsettings`.
-- The LightDM login background is copied to `/usr/share/backgrounds/custom/login-wallpaper.png`. The `/etc/lightdm/slick-greeter.conf` file is dynamically updated to apply the new background and disable the default drawing of the user background.
+### 2. Cinnamon Spices Installation
+For each applet/extension UUID, the script downloads `https://cinnamon-spices.linuxmint.com/files/<applets|extensions>/<uuid>.zip` with `curl` and extracts it into `~/.local/share/cinnamon/<applets|extensions>/`.
 
-### 3. Loading dconf Settings
-The `dconf-settings.ini` file is cleaned of Windows formatting (CRLF) and loaded via:
+### 3. Configuration Copy & Wallpaper
+Copies `.config`, `.local`, `.icons`, and `.themes` from the script directory into the user's home directory, copies `wallpaper.jpg` into the Pictures folder, and applies it as the desktop background via `gsettings`.
 
-dconf load / < dconf-settings.ini
+### 4. Loading dconf Settings
+A large predefined block of Cinnamon/GNOME/GTK/Nemo settings (panel layout, enabled applets/extensions, theme, keyboard layout, gestures, terminal profile, file manager preferences, etc.) is loaded with `dconf load /` under the current user's permissions.
 
-This ensures the immediate application of the panel layout, keyboard shortcuts, and environment behavior.
+### 5. User Avatar (AccountsService)
+`piwo.png` is copied to `/var/lib/AccountsService/icons/$USER`, and `/var/lib/AccountsService/users/$USER` is created or updated with the matching `Icon=` entry.
 
-### 4. User Avatar (AccountsService)
-The `piwo.png` image is copied to `/var/lib/AccountsService/icons/$USER`, and the account configuration file in `/var/lib/AccountsService/users/$USER` is updated.
+### 6. Login Screen Wallpaper (LightDM / Slick Greeter)
+`login-wallpaper.png` is copied to `/usr/share/backgrounds/custom/`, and — if LightDM is detected — `/etc/lightdm/slick-greeter.conf` is updated with `background=` and `draw-user-backgrounds=false` under the `[Greeter]` section.
+
+### 7. Finalization
+The temporary sudo/polkit rule is removed and the system automatically **reboots** (`systemctl reboot`) to apply all changes.
 
 ---
 
@@ -60,7 +69,7 @@ The `piwo.png` image is copied to `/var/lib/AccountsService/icons/$USER`, and th
 
 ### 1. Clone the repository or download the files
 ```bash
-git clone https://github.com/syscore88/cinnamon-config.git
+git clone https://gitlab.com/syscore88/cinnamon-config.git
 ```
 
 ### 2. Enter the downloaded folder
