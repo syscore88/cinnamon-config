@@ -529,6 +529,10 @@ side-panel-size=200
 size=(650, 500)
 state=87168
 
+[org/gnome/terminal/legacy]
+theme-variant='dark'
+default-show-menubar=false
+
 [org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9]
 background-color='rgb(0,0,0)'
 cursor-colors-set=true
