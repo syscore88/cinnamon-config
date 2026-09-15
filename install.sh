@@ -103,7 +103,7 @@ else
     MSG_PHASE_5="[5/5] Configuring login screen wallpaper..."
 fi
 
-TOTAL_STEPS=12
+TOTAL_STEPS=13
 
 CURRENT_USER=$(whoami)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
@@ -529,6 +529,14 @@ side-panel-size=200
 size=(650, 500)
 state=87168
 
+[org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9]
+background-color='rgb(0,0,0)'
+cursor-colors-set=true
+cursor-foreground-color='rgb(12,18,234)'
+foreground-color='rgb(20,219,138)'
+use-theme-colors=false
+visible-name='user'
+
 [org/x/warpinator/preferences]
 ask-for-send-permission=true
 autostart=false
@@ -562,8 +570,98 @@ fi
 show_progress 10 $TOTAL_STEPS "$MSG_PHASE_4"
 
 # ==========================================================
-# 3b. TAPETA EKRANU LOGOWANIA (LIGHTDM / SLICK-GREETER)
+# 3b. TAPETA EKRANU LOGOWANIA (LIGHTDM: SLICK-GREETER / GTK-GREETER)
 # ==========================================================
+
+# Wykrywa, którego greetera LightDM faktycznie używa system, i zwraca
+# "slick", "gtk" albo "" (nie udało się ustalić / brak LightDM).
+detect_lightdm_greeter() {
+    local conf_files=("/etc/lightdm/lightdm.conf")
+    if [[ -d /etc/lightdm/lightdm.conf.d ]]; then
+        while IFS= read -r -d '' f; do
+            conf_files+=("$f")
+        done < <(find /etc/lightdm/lightdm.conf.d -maxdepth 1 -name '*.conf' -print0 2>/dev/null)
+    fi
+
+    local greeter_session=""
+    local f
+    for f in "${conf_files[@]}"; do
+        [[ -f "$f" ]] || continue
+        local line
+        line="$(sudo grep -E '^\s*greeter-session\s*=' "$f" 2>/dev/null | tail -n1)"
+        [[ -n "$line" ]] && greeter_session="${line#*=}"
+    done
+    greeter_session="$(echo "$greeter_session" | xargs 2>/dev/null || true)"
+
+    if [[ "$greeter_session" == *slick* ]]; then
+        echo "slick"; return
+    elif [[ "$greeter_session" == *gtk* ]]; then
+        echo "gtk"; return
+    fi
+
+    # Brak jawnie ustawionego greetera (lub nie mogliśmy go odczytać) -
+    # sprawdź, co faktycznie jest zainstalowane w systemie (na podstawie
+    # binarek oraz menedżera pakietów właściwego dla wykrytej dystrybucji:
+    # Debian/Ubuntu/Mint -> dpkg, Fedora/openSUSE -> rpm, Arch -> pacman).
+    local has_slick=0
+    local has_gtk=0
+    command -v slick-greeter &>/dev/null && has_slick=1
+    [[ -x /usr/lib/lightdm/lightdm-slick-greeter ]] && has_slick=1
+    command -v lightdm-gtk-greeter &>/dev/null && has_gtk=1
+    [[ -x /usr/lib/lightdm/lightdm-gtk-greeter ]] && has_gtk=1
+
+    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS" == *"linuxmint"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+        command -v dpkg-query &>/dev/null || return
+        dpkg-query -W -f='${Status}' lightdm-slick-greeter 2>/dev/null | grep -q "install ok installed" && has_slick=1
+        dpkg-query -W -f='${Status}' lightdm-gtk-greeter 2>/dev/null | grep -q "install ok installed" && has_gtk=1
+    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+        command -v rpm &>/dev/null && {
+            rpm -q lightdm-settings-slick-greeter &>/dev/null && has_slick=1
+            { rpm -q lightdm-gtk &>/dev/null || rpm -q lightdm-gtk-greeter &>/dev/null; } && has_gtk=1
+        }
+    elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
+        command -v rpm &>/dev/null && {
+            rpm -q lightdm-slick-greeter &>/dev/null && has_slick=1
+            rpm -q lightdm-gtk-greeter &>/dev/null && has_gtk=1
+        }
+    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
+        command -v pacman &>/dev/null && {
+            pacman -Qq lightdm-slick-greeter &>/dev/null && has_slick=1
+            pacman -Qq lightdm-gtk-greeter &>/dev/null && has_gtk=1
+        }
+    fi
+
+    if [[ "$has_slick" -eq 1 && "$has_gtk" -eq 0 ]]; then
+        echo "slick"
+    elif [[ "$has_gtk" -eq 1 && "$has_slick" -eq 0 ]]; then
+        echo "gtk"
+    elif [[ "$has_slick" -eq 1 && "$has_gtk" -eq 1 ]]; then
+        # Oba zainstalowane, a greeter-session nieznany - slick-greeter
+        # jest tu bardziej prawdopodobnym wyborem (świadomie doinstalowany).
+        echo "slick"
+    else
+        echo ""
+    fi
+}
+
+set_ini_key() {
+    # set_ini_key <plik> <sekcja bez nawiasów> <klucz> <wartość>
+    local file="$1" section="$2" key="$3" value="$4"
+    sudo touch "$file"
+    if sudo grep -q "^\[$section\]" "$file" 2>/dev/null; then
+        if sudo grep -q "^${key}=" "$file"; then
+            sudo sed -i "s|^${key}=.*|${key}=${value}|" "$file" || true
+        else
+            sudo sed -i "/^\[$section\]/a ${key}=${value}" "$file" || true
+        fi
+    else
+        {
+            echo "[$section]"
+            echo "${key}=${value}"
+        } | sudo tee -a "$file" > /dev/null
+    fi
+}
+
 if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     show_progress 11 $TOTAL_STEPS "$MSG_PHASE_5"
 
@@ -575,28 +673,31 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     sudo chmod 644 "$LOGIN_BG_DEST" || true
 
     if [[ -d /etc/lightdm ]] || command -v lightdm &>/dev/null; then
-        sudo mkdir -p /etc/lightdm/slick-greeter.conf.d || true
-        SLICK_CONF="/etc/lightdm/slick-greeter.conf"
-        sudo touch "$SLICK_CONF"
+        LIGHTDM_GREETER="$(detect_lightdm_greeter)"
 
-        if sudo grep -q "^\[Greeter\]" "$SLICK_CONF" 2>/dev/null; then
-            if sudo grep -q "^background=" "$SLICK_CONF"; then
-                sudo sed -i "s|^background=.*|background=$LOGIN_BG_DEST|" "$SLICK_CONF" || true
-            else
-                sudo sed -i "/^\[Greeter\]/a background=$LOGIN_BG_DEST" "$SLICK_CONF" || true
-            fi
-            if sudo grep -q "^draw-user-backgrounds=" "$SLICK_CONF"; then
-                sudo sed -i "s|^draw-user-backgrounds=.*|draw-user-backgrounds=false|" "$SLICK_CONF" || true
-            else
-                sudo sed -i "/^\[Greeter\]/a draw-user-backgrounds=false" "$SLICK_CONF" || true
-            fi
-        else
-            {
-                echo "[Greeter]"
-                echo "background=$LOGIN_BG_DEST"
-                echo "draw-user-backgrounds=false"
-            } | sudo tee -a "$SLICK_CONF" > /dev/null
-        fi
+        show_progress 12 $TOTAL_STEPS "$MSG_PHASE_5"
+
+        case "$LIGHTDM_GREETER" in
+            slick)
+                log_info "Wykryto slick-greeter, konfiguruję /etc/lightdm/slick-greeter.conf" "Detected slick-greeter, configuring /etc/lightdm/slick-greeter.conf"
+                sudo mkdir -p /etc/lightdm/slick-greeter.conf.d || true
+                set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "background" "$LOGIN_BG_DEST"
+                set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "draw-user-backgrounds" "false"
+                ;;
+            gtk)
+                log_info "Wykryto lightdm-gtk-greeter, konfiguruję /etc/lightdm/lightdm-gtk-greeter.conf" "Detected lightdm-gtk-greeter, configuring /etc/lightdm/lightdm-gtk-greeter.conf"
+                set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "background" "$LOGIN_BG_DEST"
+                set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "user-background" "false"
+                ;;
+            *)
+                log_warn "Nie udało się wykryć greetera LightDM - konfiguruję oba pliki (slick-greeter i gtk-greeter) na wszelki wypadek." "Could not detect the LightDM greeter - configuring both slick-greeter and gtk-greeter files just in case."
+                sudo mkdir -p /etc/lightdm/slick-greeter.conf.d || true
+                set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "background" "$LOGIN_BG_DEST"
+                set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "draw-user-backgrounds" "false"
+                set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "background" "$LOGIN_BG_DEST"
+                set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "user-background" "false"
+                ;;
+        esac
     fi
 fi
 
@@ -610,7 +711,7 @@ else
     sudo rm -f /etc/sudoers.d/99-temp-installer
 fi
 
-show_progress 12 $TOTAL_STEPS "$MSG_PHASE_5"
+show_progress 13 $TOTAL_STEPS "$MSG_PHASE_5"
 echo -e "\n" >&3
 
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
