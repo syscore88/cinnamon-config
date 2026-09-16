@@ -550,7 +550,6 @@ if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
     sudo mkdir -p "$(dirname "$AVATAR_DEST")" || true
     sudo cp -af "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" || true
-    sudo chown root:root "$AVATAR_DEST" || true
     sudo chmod 644 "$AVATAR_DEST" || true
 
     ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
@@ -572,6 +571,7 @@ show_progress 10 $TOTAL_STEPS "$MSG_PHASE_4"
 # ==========================================================
 # 3b. TAPETA EKRANU LOGOWANIA (LIGHTDM: SLICK-GREETER / GTK-GREETER)
 # ==========================================================
+
 
 detect_lightdm_greeter() {
     local conf_files=("/etc/lightdm/lightdm.conf")
@@ -630,7 +630,6 @@ detect_lightdm_greeter() {
     elif [[ "$has_gtk" -eq 1 && "$has_slick" -eq 0 ]]; then
         echo "gtk"
     elif [[ "$has_slick" -eq 1 && "$has_gtk" -eq 1 ]]; then
-
         echo "slick"
     else
         echo ""
