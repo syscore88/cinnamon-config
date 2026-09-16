@@ -577,8 +577,6 @@ show_progress 10 $TOTAL_STEPS "$MSG_PHASE_4"
 # 3b. TAPETA EKRANU LOGOWANIA (LIGHTDM: SLICK-GREETER / GTK-GREETER)
 # ==========================================================
 
-# Wykrywa, którego greetera LightDM faktycznie używa system, i zwraca
-# "slick", "gtk" albo "" (nie udało się ustalić / brak LightDM).
 detect_lightdm_greeter() {
     local conf_files=("/etc/lightdm/lightdm.conf")
     if [[ -d /etc/lightdm/lightdm.conf.d ]]; then
@@ -603,10 +601,6 @@ detect_lightdm_greeter() {
         echo "gtk"; return
     fi
 
-    # Brak jawnie ustawionego greetera (lub nie mogliśmy go odczytać) -
-    # sprawdź, co faktycznie jest zainstalowane w systemie (na podstawie
-    # binarek oraz menedżera pakietów właściwego dla wykrytej dystrybucji:
-    # Debian/Ubuntu/Mint -> dpkg, Fedora/openSUSE -> rpm, Arch -> pacman).
     local has_slick=0
     local has_gtk=0
     command -v slick-greeter &>/dev/null && has_slick=1
@@ -640,8 +634,7 @@ detect_lightdm_greeter() {
     elif [[ "$has_gtk" -eq 1 && "$has_slick" -eq 0 ]]; then
         echo "gtk"
     elif [[ "$has_slick" -eq 1 && "$has_gtk" -eq 1 ]]; then
-        # Oba zainstalowane, a greeter-session nieznany - slick-greeter
-        # jest tu bardziej prawdopodobnym wyborem (świadomie doinstalowany).
+
         echo "slick"
     else
         echo ""
@@ -649,7 +642,6 @@ detect_lightdm_greeter() {
 }
 
 set_ini_key() {
-    # set_ini_key <plik> <sekcja bez nawiasów> <klucz> <wartość>
     local file="$1" section="$2" key="$3" value="$4"
     sudo touch "$file"
     if sudo grep -q "^\[$section\]" "$file" 2>/dev/null; then
@@ -683,18 +675,15 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
 
         case "$LIGHTDM_GREETER" in
             slick)
-                log_info "Wykryto slick-greeter, konfiguruję /etc/lightdm/slick-greeter.conf" "Detected slick-greeter, configuring /etc/lightdm/slick-greeter.conf"
                 sudo mkdir -p /etc/lightdm/slick-greeter.conf.d || true
                 set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "background" "$LOGIN_BG_DEST"
                 set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "draw-user-backgrounds" "false"
                 ;;
             gtk)
-                log_info "Wykryto lightdm-gtk-greeter, konfiguruję /etc/lightdm/lightdm-gtk-greeter.conf" "Detected lightdm-gtk-greeter, configuring /etc/lightdm/lightdm-gtk-greeter.conf"
                 set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "background" "$LOGIN_BG_DEST"
                 set_ini_key "/etc/lightdm/lightdm-gtk-greeter.conf" "greeter" "user-background" "false"
                 ;;
             *)
-                log_warn "Nie udało się wykryć greetera LightDM - konfiguruję oba pliki (slick-greeter i gtk-greeter) na wszelki wypadek." "Could not detect the LightDM greeter - configuring both slick-greeter and gtk-greeter files just in case."
                 sudo mkdir -p /etc/lightdm/slick-greeter.conf.d || true
                 set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "background" "$LOGIN_BG_DEST"
                 set_ini_key "/etc/lightdm/slick-greeter.conf" "Greeter" "draw-user-backgrounds" "false"
