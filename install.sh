@@ -205,6 +205,7 @@ CINNAMON_APPLETS=(
     "ScreenShot@tech71"
     "sticky@scollins"
     "weather@mockturtl"
+    "spicy-clipboard-applet@Twilight0"
 )
 
 CINNAMON_EXTENSIONS=(
@@ -248,15 +249,9 @@ show_progress 2 $TOTAL_STEPS "$MSG_PHASE_2"
 install_cinnamon_packages
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_2"
 
-install_spices_dependencies
 show_progress 4 $TOTAL_STEPS "$MSG_PHASE_3"
 
-for uuid in "${CINNAMON_APPLETS[@]}"; do
-    install_cinnamon_spice "applets" "$uuid"
-done
-for uuid in "${CINNAMON_EXTENSIONS[@]}"; do
-    install_cinnamon_spice "extensions" "$uuid"
-done
+install_all_cinnamon_spices
 show_progress 5 $TOTAL_STEPS "$MSG_PHASE_3"
 
 # ==========================================================
@@ -555,6 +550,7 @@ if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
     sudo mkdir -p "$(dirname "$AVATAR_DEST")" || true
     sudo cp -af "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" || true
+    sudo chown root:root "$AVATAR_DEST" || true
     sudo chmod 644 "$AVATAR_DEST" || true
 
     ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
@@ -658,9 +654,9 @@ set_ini_key() {
     fi
 }
 
-if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
-    show_progress 11 $TOTAL_STEPS "$MSG_PHASE_5"
+show_progress 11 $TOTAL_STEPS "$MSG_PHASE_5"
 
+if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     LOGIN_BG_DIR="/usr/share/backgrounds/custom"
     LOGIN_BG_DEST="$LOGIN_BG_DIR/login-wallpaper.png"
 
@@ -670,8 +666,6 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
 
     if [[ -d /etc/lightdm ]] || command -v lightdm &>/dev/null; then
         LIGHTDM_GREETER="$(detect_lightdm_greeter)"
-
-        show_progress 12 $TOTAL_STEPS "$MSG_PHASE_5"
 
         case "$LIGHTDM_GREETER" in
             slick)
@@ -693,6 +687,8 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
         esac
     fi
 fi
+
+show_progress 12 $TOTAL_STEPS "$MSG_PHASE_5"
 
 # ==========================================================
 # 4. ZAKOŃCZENIE I SPRZĄTANIE
