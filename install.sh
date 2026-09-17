@@ -191,11 +191,11 @@ detect_os() {
 install_cinnamon_packages() {
     if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
-        for pkg in cinnamon-settings cinnamon-control-center dconf-cli; do
+        for pkg in cinnamon-control-center dconf-cli; do
             sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-        for pkg in cinnamon-settings cinnamon-control-center dconf; do
+        for pkg in cinnamon-control-center dconf; do
             sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
@@ -203,12 +203,12 @@ install_cinnamon_packages() {
             sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
-        for pkg in cinnamon-settings cinnamon-control-center dconf; do
+        for pkg in cinnamon-control-center dconf; do
             sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
-        log_warn "Nierozpoznana dystrybucja ($OS) - pomijam instalację pakietów Cinnamon. Zainstaluj ręcznie: cinnamon-settings, cinnamon-control-center, dconf-cli/dconf." \
-                 "Unrecognized distribution ($OS) - skipping Cinnamon package installation. Install manually: cinnamon-settings, cinnamon-control-center, dconf-cli/dconf."
+        log_warn "Nierozpoznana dystrybucja ($OS) - pomijam instalację pakietów Cinnamon. Zainstaluj ręcznie: cinnamon-control-center, dconf-cli/dconf." \
+                 "Unrecognized distribution ($OS) - skipping Cinnamon package installation. Install manually: cinnamon-control-center, dconf-cli/dconf."
     fi
 
     if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
