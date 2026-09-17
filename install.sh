@@ -105,17 +105,15 @@ show_progress() {
 }
 
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
-    MSG_PHASE_1="[1/5] Wykrywanie dystrybucji i konfiguracja uprawnień..."
-    MSG_PHASE_2="[2/5] Instalacja i weryfikacja pakietów Cinnamon..."
-    MSG_PHASE_3="[3/5] Instalacja apletów i rozszerzeń Cinnamon Spices..."
-    MSG_PHASE_4="[4/5] Konfiguracja środowiska, tapety i ustawień wizualnych..."
-    MSG_PHASE_5="[5/5] Konfiguracja tapety ekranu logowania..."
+    MSG_PREP="Przygotowywanie..."
+    MSG_INSTALL="Instalacja..."
+    MSG_OPTIMIZE="Optymalizacja..."
+    MSG_FINALIZE="Finalizowanie..."
 else
-    MSG_PHASE_1="[1/5] Detecting distribution and configuring permissions..."
-    MSG_PHASE_2="[2/5] Installing and verifying Cinnamon packages..."
-    MSG_PHASE_3="[3/5] Installing Cinnamon Spices applets and extensions..."
-    MSG_PHASE_4="[4/5] Configuring environment, wallpaper, and visual settings..."
-    MSG_PHASE_5="[5/5] Configuring login screen wallpaper..."
+    MSG_PREP="Preparing..."
+    MSG_INSTALL="Installation..."
+    MSG_OPTIMIZE="Optimization..."
+    MSG_FINALIZE="Finalizing..."
 fi
 
 TOTAL_STEPS=13
@@ -166,13 +164,13 @@ fi
 # ==========================================================
 # 1. WSTĘPNE SPRAWDZENIA I UPRAWNIENIA
 # ==========================================================
-show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
+show_progress 0 $TOTAL_STEPS "$MSG_PREP"
 
 printf '\033[?7h' >&3
 
 printf '\033[?7l' >&3
 
-show_progress 1 $TOTAL_STEPS "$MSG_PHASE_1"
+show_progress 1 $TOTAL_STEPS "$MSG_PREP"
 
 # ==========================================================
 # 2. WYKRYWANIE DYSTRYBUCJI I INSTALACJA PAKIETÓW
@@ -283,20 +281,20 @@ install_all_cinnamon_spices() {
 }
 
 detect_os
-show_progress 2 $TOTAL_STEPS "$MSG_PHASE_2"
+show_progress 2 $TOTAL_STEPS "$MSG_INSTALL"
 
 install_cinnamon_packages
-show_progress 3 $TOTAL_STEPS "$MSG_PHASE_2"
+show_progress 3 $TOTAL_STEPS "$MSG_INSTALL"
 
-show_progress 4 $TOTAL_STEPS "$MSG_PHASE_3"
+show_progress 4 $TOTAL_STEPS "$MSG_INSTALL"
 
 install_all_cinnamon_spices
-show_progress 5 $TOTAL_STEPS "$MSG_PHASE_3"
+show_progress 5 $TOTAL_STEPS "$MSG_INSTALL"
 
 # ==========================================================
 # 3. KONFIGURACJA WIZUALNA CINNAMON
 # ==========================================================
-show_progress 6 $TOTAL_STEPS "$MSG_PHASE_4"
+show_progress 6 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if [[ -d "$SCRIPT_DIR/.config" ]]; then cp -af "$SCRIPT_DIR/.config/." ~/.config/ || true; fi
 if [[ -d "$SCRIPT_DIR/.local" ]]; then cp -af "$SCRIPT_DIR/.local/." ~/.local/ || true; fi
@@ -316,14 +314,14 @@ if [[ -f "$SCRIPT_DIR/wallpaper.jpg" ]]; then
     cp -af "$SCRIPT_DIR/wallpaper.jpg" "$wallpaper_PATH" || true
 fi
 
-show_progress 7 $TOTAL_STEPS "$MSG_PHASE_4"
+show_progress 7 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.cinnamon.desktop.background picture-uri "file://$wallpaper_PATH" 2>/dev/null \
         && gsettings set org.cinnamon.desktop.background picture-options "zoom" 2>/dev/null || true
 fi
 
-show_progress 8 $TOTAL_STEPS "$MSG_PHASE_4"
+show_progress 8 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if command -v dconf &>/dev/null; then
     mkdir -p "$HOME/.config/dconf"
@@ -583,7 +581,7 @@ no-overwrite=true
 DCONF_EOF
 fi
 
-show_progress 9 $TOTAL_STEPS "$MSG_PHASE_4"
+show_progress 9 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
@@ -605,7 +603,7 @@ if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     fi
 fi
 
-show_progress 10 $TOTAL_STEPS "$MSG_PHASE_4"
+show_progress 10 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 # ==========================================================
 # 3b. TAPETA EKRANU LOGOWANIA (LIGHTDM: SLICK-GREETER / GTK-GREETER)
@@ -692,7 +690,7 @@ set_ini_key() {
     fi
 }
 
-show_progress 11 $TOTAL_STEPS "$MSG_PHASE_5"
+show_progress 11 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     LOGIN_BG_DIR="/usr/share/backgrounds/custom"
@@ -726,7 +724,7 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     fi
 fi
 
-show_progress 12 $TOTAL_STEPS "$MSG_PHASE_5"
+show_progress 12 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 # ==========================================================
 # 4. ZAKOŃCZENIE I SPRZĄTANIE
@@ -738,7 +736,7 @@ else
     sudo rm -f /etc/sudoers.d/99-temp-installer
 fi
 
-show_progress 13 $TOTAL_STEPS "$MSG_PHASE_5"
+show_progress 13 $TOTAL_STEPS "$MSG_FINALIZE"
 echo -e "\n" >&3
 
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
