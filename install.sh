@@ -4,6 +4,9 @@
 # ==========================================================
 
 set -Eeuo pipefail
+
+FAILED_PACKAGES=()
+FAILED_SPICES=()
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -33,13 +36,21 @@ exec >>"$TMP_LOG" 2>&1
 cleanup_on_exit() {
     local exit_code=$?
     printf '\033[?7h' >&3
-    if [ "$exit_code" -ne 0 ]; then
+    if [ "$exit_code" -ne 0 ] || [ "${#FAILED_PACKAGES[@]}" -gt 0 ] || [ "${#FAILED_SPICES[@]}" -gt 0 ]; then
         echo -e "\n" >&3
         cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
-        if [[ "$SCRIPT_LANG" == "pl" ]]; then
-            echo -e "${ERR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
+        if [ "$exit_code" -ne 0 ]; then
+            if [[ "$SCRIPT_LANG" == "pl" ]]; then
+                echo -e "${ERR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
+            else
+                echo -e "${ERR}✘ An error occurred (code: $exit_code). Detailed log saved to: $LOG_FILE${NC}" >&3
+            fi
         else
-            echo -e "${ERR}✘ An error occurred (code: $exit_code). Detailed log saved to: $LOG_FILE${NC}" >&3
+            if [[ "$SCRIPT_LANG" == "pl" ]]; then
+                echo -e "${WARN}⚠ Niektóre pakiety nie zostały zainstalowane. Log zapisano w: $LOG_FILE${NC}" >&3
+            else
+                echo -e "${WARN}⚠ Some packages failed to install. Log saved to: $LOG_FILE${NC}" >&3
+            fi
         fi
     fi
     rm -f "$TMP_LOG"
@@ -47,10 +58,14 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT
 
 _pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
-log_info()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${INFO}==> $m${NC}"; }
-log_ok()    { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${SUCCESS}✔ $m${NC}"; }
-log_err()   { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${ERR}✘ ERROR: $m${NC}"; }
-log_warn()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${WARN}⚠ WARN: $m${NC}"; }
+_log_write() {
+    echo -e "$1"
+    echo -e "$1" >&3
+}
+log_info()  { local m; m="$(_pick_msg "$1" "$2")"; _log_write "${INFO}==> $m${NC}"; }
+log_ok()    { local m; m="$(_pick_msg "$1" "$2")"; _log_write "${SUCCESS}✔ $m${NC}"; }
+log_err()   { local m; m="$(_pick_msg "$1" "$2")"; _log_write "${ERR}✘ ERROR: $m${NC}"; }
+log_warn()  { local m; m="$(_pick_msg "$1" "$2")"; _log_write "${WARN}⚠ WARN: $m${NC}"; }
 
 trap 'log_err "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND"' ERR
 
@@ -117,14 +132,28 @@ fi
 
 RUN0_NOPASSWD_FILE="/etc/polkit-1/rules.d/51-run0-nopasswd.rules"
 USE_RUN0=0
-if ! command -v visudo >/dev/null 2>&1 || sudo --version 2>/dev/null | grep -qi "run0"; then
+if ! command -v visudo >/dev/null 2>&1; then
+    USE_RUN0=1
+elif command -v run0 >/dev/null 2>&1 && sudo --version 2>/dev/null | grep -qi "run0"; then
     USE_RUN0=1
 fi
 
+if [[ "$SCRIPT_LANG" == "pl" ]]; then
+    echo -e "${INFO}==> Może zostać wyświetlona prośba o podanie hasła sudo.${NC}" >&3
+else
+    echo -e "${INFO}==> You may be asked for your sudo password below.${NC}" >&3
+fi
 sudo -v
 
 if [[ "$USE_RUN0" -eq 1 ]]; then
-    printf 'polkit._run0_nopasswd.push("%s");\n' "$CURRENT_USER" | sudo tee "$RUN0_NOPASSWD_FILE" > /dev/null
+    sudo tee "$RUN0_NOPASSWD_FILE" > /dev/null <<POLKIT_RULE_EOF
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "$CURRENT_USER") {
+        return polkit.Result.YES;
+    }
+});
+POLKIT_RULE_EOF
     sudo systemctl try-restart polkit 2>/dev/null || true
 else
     SUDOERS_TMP="$(mktemp)"
@@ -168,20 +197,28 @@ install_cinnamon_packages() {
     if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
         for pkg in cinnamon-settings cinnamon-control-center dconf-cli; do
-            sudo apt-get install -yq "$pkg" || true
+            sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
         for pkg in cinnamon-settings cinnamon-control-center dconf; do
-            sudo dnf install -yq "$pkg" || true
+            sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
         for pkg in cinnamon-control-center dconf; do
-            sudo pacman -S --noconfirm --needed "$pkg" || true
+            sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
         for pkg in cinnamon-settings cinnamon-control-center dconf; do
-            sudo zypper install -yqn "$pkg" || true
+            sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
+    else
+        log_warn "Nierozpoznana dystrybucja ($OS) - pomijam instalację pakietów Cinnamon. Zainstaluj ręcznie: cinnamon-settings, cinnamon-control-center, dconf-cli/dconf." \
+                 "Unrecognized distribution ($OS) - skipping Cinnamon package installation. Install manually: cinnamon-settings, cinnamon-control-center, dconf-cli/dconf."
+    fi
+
+    if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
+        log_warn "Nie udało się zainstalować: ${FAILED_PACKAGES[*]}. Sprawdź log: $LOG_FILE" \
+                 "Failed to install: ${FAILED_PACKAGES[*]}. Check the log: $LOG_FILE"
     fi
 }
 
@@ -224,8 +261,10 @@ install_cinnamon_spice() {
 
     mkdir -p "$dest_dir"
 
-    if curl -fsSL "$url" -o "$tmp_zip"; then
-        unzip -oq "$tmp_zip" -d "$dest_dir" || true
+    if curl -fsSL "$url" -o "$tmp_zip" && unzip -oq "$tmp_zip" -d "$dest_dir"; then
+        :
+    else
+        FAILED_SPICES+=("$uuid")
     fi
 
     rm -f "$tmp_zip"
@@ -241,6 +280,11 @@ install_all_cinnamon_spices() {
     for uuid in "${CINNAMON_EXTENSIONS[@]}"; do
         install_cinnamon_spice "extensions" "$uuid"
     done
+
+    if [[ ${#FAILED_SPICES[@]} -gt 0 ]]; then
+        log_warn "Nie udało się pobrać apletów/rozszerzeń: ${FAILED_SPICES[*]}. Sprawdź log: $LOG_FILE" \
+                 "Failed to download applets/extensions: ${FAILED_SPICES[*]}. Check the log: $LOG_FILE"
+    fi
 }
 
 detect_os
