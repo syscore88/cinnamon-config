@@ -252,46 +252,30 @@ detect_os() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
         OS="${ID:-}"
-        OS_LIKE="${ID_LIKE:-}"
+        OS_LIKE="${ID_LIKE:-${ID:-}}"
     else
         OS="unknown"
         OS_LIKE=""
     fi
 }
 
-pkg_installed() {
-    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
-        [[ "$(dpkg-query -W -f='${db:Status-Abbrev}' "$1" 2>/dev/null)" == ii* ]]
-    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* || "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
-        rpm -q --quiet "$1" &>/dev/null
-    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
-        pacman -Qq "$1" &>/dev/null
-    else
-        return 1
-    fi
-}
-
 install_cinnamon_packages() {
     wait_for_pkg_lock
-    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+    if [[ "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
         for pkg in cinnamon-control-center dconf-cli; do
-            pkg_installed "$pkg" && continue
             sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
-    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+    elif [[ "$OS_LIKE" == *"fedora"* ]]; then
         for pkg in cinnamon-control-center dconf; do
-            pkg_installed "$pkg" && continue
             sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
-    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
+    elif [[ "$OS_LIKE" == *"arch"* ]]; then
         for pkg in cinnamon-control-center dconf; do
-            pkg_installed "$pkg" && continue
             sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
-    elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
+    elif [[ "$OS_LIKE" == *"suse"* ]]; then
         for pkg in cinnamon-control-center dconf; do
-            pkg_installed "$pkg" && continue
             sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
@@ -310,18 +294,15 @@ install_cinnamon_packages() {
 # ==========================================================
 install_spices_dependencies() {
     wait_for_pkg_lock
-    for pkg in curl unzip; do
-        pkg_installed "$pkg" && continue
-        if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
-            sudo apt-get install -yq "$pkg" || true
-        elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-            sudo dnf install -yq "$pkg" || true
-        elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
-            sudo pacman -S --noconfirm --needed "$pkg" || true
-        elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
-            sudo zypper install -yqn "$pkg" || true
-        fi
-    done
+    if [[ "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+        sudo apt-get install -yq curl unzip || true
+    elif [[ "$OS_LIKE" == *"fedora"* ]]; then
+        sudo dnf install -yq curl unzip || true
+    elif [[ "$OS_LIKE" == *"arch"* ]]; then
+        sudo pacman -S --noconfirm --needed curl unzip || true
+    elif [[ "$OS_LIKE" == *"suse"* ]]; then
+        sudo zypper install -yqn curl unzip || true
+    fi
 }
 
 CINNAMON_APPLETS=(
@@ -738,21 +719,21 @@ detect_lightdm_greeter() {
     command -v lightdm-gtk-greeter &>/dev/null && has_gtk=1
     [[ -x /usr/lib/lightdm/lightdm-gtk-greeter ]] && has_gtk=1
 
-    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS" == *"linuxmint"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+    if [[ "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         command -v dpkg-query &>/dev/null || return
         dpkg-query -W -f='${Status}' lightdm-slick-greeter 2>/dev/null | grep -q "install ok installed" && has_slick=1
         dpkg-query -W -f='${Status}' lightdm-gtk-greeter 2>/dev/null | grep -q "install ok installed" && has_gtk=1
-    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+    elif [[ "$OS_LIKE" == *"fedora"* ]]; then
         command -v rpm &>/dev/null && {
             rpm -q lightdm-settings-slick-greeter &>/dev/null && has_slick=1
             { rpm -q lightdm-gtk &>/dev/null || rpm -q lightdm-gtk-greeter &>/dev/null; } && has_gtk=1
         }
-    elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
+    elif [[ "$OS_LIKE" == *"suse"* ]]; then
         command -v rpm &>/dev/null && {
             rpm -q lightdm-slick-greeter &>/dev/null && has_slick=1
             rpm -q lightdm-gtk-greeter &>/dev/null && has_gtk=1
         }
-    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
+    elif [[ "$OS_LIKE" == *"arch"* ]]; then
         command -v pacman &>/dev/null && {
             pacman -Qq lightdm-slick-greeter &>/dev/null && has_slick=1
             pacman -Qq lightdm-gtk-greeter &>/dev/null && has_gtk=1
