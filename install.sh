@@ -259,23 +259,39 @@ detect_os() {
     fi
 }
 
+pkg_installed() {
+    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+        [[ "$(dpkg-query -W -f='${db:Status-Abbrev}' "$1" 2>/dev/null)" == ii* ]]
+    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* || "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
+        rpm -q --quiet "$1" &>/dev/null
+    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
+        pacman -Qq "$1" &>/dev/null
+    else
+        return 1
+    fi
+}
+
 install_cinnamon_packages() {
     wait_for_pkg_lock
     if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
         for pkg in cinnamon-control-center dconf-cli; do
+            pkg_installed "$pkg" && continue
             sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
         for pkg in cinnamon-control-center dconf; do
+            pkg_installed "$pkg" && continue
             sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
         for pkg in cinnamon-control-center dconf; do
+            pkg_installed "$pkg" && continue
             sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
         for pkg in cinnamon-control-center dconf; do
+            pkg_installed "$pkg" && continue
             sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
@@ -294,15 +310,18 @@ install_cinnamon_packages() {
 # ==========================================================
 install_spices_dependencies() {
     wait_for_pkg_lock
-    if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
-        sudo apt-get install -yq curl unzip || true
-    elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
-        sudo dnf install -yq curl unzip || true
-    elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
-        sudo pacman -S --noconfirm --needed curl unzip || true
-    elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
-        sudo zypper install -yqn curl unzip || true
-    fi
+    for pkg in curl unzip; do
+        pkg_installed "$pkg" && continue
+        if [[ "$OS" == *"ubuntu"* || "$OS" == *"debian"* || "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
+            sudo apt-get install -yq "$pkg" || true
+        elif [[ "$OS" == "fedora" || "$OS_LIKE" == *"fedora"* ]]; then
+            sudo dnf install -yq "$pkg" || true
+        elif [[ "$OS" == "arch" || "$OS_LIKE" == *"arch"* || "$OS" == "manjaro" ]]; then
+            sudo pacman -S --noconfirm --needed "$pkg" || true
+        elif [[ "$OS" == *"opensuse"* || "$OS" == *"suse"* || "$OS_LIKE" == *"suse"* ]]; then
+            sudo zypper install -yqn "$pkg" || true
+        fi
+    done
 }
 
 CINNAMON_APPLETS=(
