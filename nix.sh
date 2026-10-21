@@ -7,9 +7,6 @@ set -Eeuo pipefail
 
 FAILED_SPICES=()
 
-# ==========================================
-# 1. WYKRYWANIE JĘZYKA SYSTEMU I ZMIENNE
-# ==========================================
 detect_system_lang() {
     local sys_lang="${LANG:-}"
     [[ -z "$sys_lang" ]] && sys_lang="${LC_ALL:-${LC_MESSAGES:-}}"
@@ -84,8 +81,6 @@ show_progress() {
     local msg=$3
     local percent=$(( step * 100 / total ))
 
-    # Szerokość terminala czytana bezpośrednio z /dev/tty
-    # (stdout/stderr skryptu są przekierowane do pliku logu, więc tput by tu zawiódł)
     local cols
     cols=$(stty size </dev/tty 2>/dev/null || true)
     cols="${cols##* }"
@@ -146,7 +141,7 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 
 # ==========================================
-# 2. UPRAWNIENIA TYMCZASOWE (SUDO / POLKIT)
+# 1. UPRAWNIENIA TYMCZASOWE (SUDO / POLKIT)
 # ==========================================
 RUN0_NOPASSWD_FILE="/etc/polkit-1/rules.d/51-run0-nopasswd.rules"
 USE_RUN0=0
@@ -201,7 +196,7 @@ printf '\033[?7l' >&3
 show_progress 0 $TOTAL_STEPS "$MSG_PREP"
 
 # ==========================================
-# 3. KONFIGURACJA SYSTEMOWA (NIXOS)
+# 2. KONFIGURACJA SYSTEMOWA (NIXOS)
 # ==========================================
 NIXOS_DIR="/etc/nixos"
 NIXOS_CONF="$NIXOS_DIR/configuration.nix"
@@ -303,7 +298,7 @@ fi
 show_progress 2 $TOTAL_STEPS "$MSG_INSTALL"
 
 # ==========================================================
-# 3b. INSTALACJA APLETÓW/ROZSZERZEŃ (CINNAMON SPICES)
+# 3. INSTALACJA APLETÓW/ROZSZERZEŃ (CINNAMON SPICES)
 # ==========================================================
 CINNAMON_APPLETS=(
     "download-and-upload-speed@cardsurf"
