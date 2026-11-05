@@ -29,12 +29,14 @@ The script auto-detects the system language (Polish/English) from the `LANG`/`LC
 
 The script identifies the OS using `/etc/os-release` (`ID` / `ID_LIKE`) and selects the corresponding package manager:
 
-| Distribution | Package Manager | Installed Packages |
-| :--- | :--- | :--- |
-| **Debian / Ubuntu** and derivatives | `apt` | `cinnamon-settings`, `cinnamon-control-center`, `dconf-cli` |
-| **Fedora** and derivatives | `dnf` | `cinnamon-settings`, `cinnamon-control-center`, `dconf` |
-| **Arch Linux / Manjaro** | `pacman` | `cinnamon-control-center`, `dconf` |
-| **openSUSE / SUSE** | `zypper` | `cinnamon-settings`, `cinnamon-control-center`, `dconf` |
+| Distribution | Package Manager |
+| :--- | :--- |
+| **Arch Linux / Manjaro / EndeavourOS** | `pacman` |
+| **Debian / Ubuntu** | `apt` |
+| **openSUSE / SUSE** | `zypper` |
+| **Fedora / RHEL** | `dnf` |
+| **Void** | `xbps` | 
+| **NixOs** | `nix` | 
 
 `curl` and `unzip` are additionally installed on all distributions as dependencies for downloading Cinnamon Spices.
 
