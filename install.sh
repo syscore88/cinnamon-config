@@ -59,7 +59,7 @@ cleanup_on_exit() {
     local do_reboot=0
     [ "$exit_code" -eq 0 ] && [ "${DO_REBOOT:-0}" = "1" ] && do_reboot=1
     if [ "${SUDO_READY:-0}" = "1" ]; then
-        sudo sh -c 'rm -f "$1" "$2"; systemctl try-restart polkit 2>/dev/null; [ "$3" = 1 ] && systemctl reboot' _ \
+        sudo sh -c 'rm -f "$1" "$2"; systemctl try-restart polkit 2>/dev/null; [ "$3" = 1 ] && { systemctl reboot 2>/dev/null || reboot; }' _ \
             "${RUN0_NOPASSWD_FILE:-/etc/polkit-1/rules.d/51-run0-nopasswd.rules}" \
             "/etc/sudoers.d/99-temp-installer" \
             "$do_reboot"
@@ -111,7 +111,7 @@ _pkg_lock_busy() {
         [[ -e "$f" ]] || continue
         sudo fuser "$f" >/dev/null 2>&1 && return 0
     done
-    pgrep -x 'apt|apt-get|dpkg|zypper|pacman|dnf|dnf5|packagekitd' >/dev/null 2>&1 && return 0
+    pgrep -x 'apt|apt-get|dpkg|zypper|pacman|dnf|dnf5|xbps-install|packagekitd' >/dev/null 2>&1 && return 0
     return 1
 }
 
@@ -279,6 +279,11 @@ install_cinnamon_packages() {
         for pkg in cinnamon-control-center dconf; do
             sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
+    elif [[ "$OS_LIKE" == *"void"* ]]; then
+        sudo xbps-install -Suy xbps || true
+        for pkg in dbus elogind NetworkManager xorg-minimal qt6-wayland kwayland mesa-dri xorg-server-xwayland lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center dconf; do
+            sudo xbps-install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     else
         log_warn "Nierozpoznana dystrybucja ($OS) - pomijam instalację pakietów Cinnamon. Zainstaluj ręcznie: cinnamon-control-center, dconf-cli/dconf." \
                  "Unrecognized distribution ($OS) - skipping Cinnamon package installation. Install manually: cinnamon-control-center, dconf-cli/dconf."
@@ -303,6 +308,8 @@ install_spices_dependencies() {
         sudo pacman -S --noconfirm --needed curl unzip || true
     elif [[ "$OS_LIKE" == *"suse"* ]]; then
         sudo zypper install -yqn curl unzip || true
+    elif [[ "$OS_LIKE" == *"void"* ]]; then
+        sudo xbps-install -y curl unzip || true
     fi
 }
 
@@ -739,6 +746,11 @@ detect_lightdm_greeter() {
             pacman -Qq lightdm-slick-greeter &>/dev/null && has_slick=1
             pacman -Qq lightdm-gtk-greeter &>/dev/null && has_gtk=1
         }
+    elif [[ "$OS_LIKE" == *"void"* ]]; then
+        if command -v xbps-query &>/dev/null; then
+            xbps-query lightdm-slick-greeter &>/dev/null && has_slick=1 || true
+            xbps-query lightdm-gtk3-greeter &>/dev/null && has_gtk=1 || true
+        fi
     fi
 
     if [[ "$has_slick" -eq 1 && "$has_gtk" -eq 0 ]]; then
@@ -816,6 +828,19 @@ if [[ "$SCRIPT_LANG" == "pl" ]]; then
     echo -e "${SUCCESS}✔ KONFIGURACJA WIZUALNA ZAKOŃCZONA!${NC}" >&3
 else
     echo -e "${SUCCESS}✔ VISUAL CONFIGURATION COMPLETED!${NC}" >&3
+fi
+
+if [[ "$OS_LIKE" == *"void"* ]]; then
+    for svc in dhcpcd wpa_supplicant; do
+        if [[ -L "/var/service/$svc" ]]; then
+            sudo rm -f "/var/service/$svc" || true
+        fi
+    done
+    for svc in dbus elogind NetworkManager lightdm; do
+        if [[ -d "/etc/sv/$svc" && ! -e "/var/service/$svc" ]]; then
+            sudo ln -s "/etc/sv/$svc" "/var/service/$svc" || true
+        fi
+    done
 fi
 
 DO_REBOOT=1
