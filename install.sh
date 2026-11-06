@@ -281,7 +281,7 @@ install_cinnamon_packages() {
         done
     elif [[ "$OS_LIKE" == *"void"* ]]; then
         sudo xbps-install -Suy xbps || true
-        for pkg in dbus elogind NetworkManager xorg-minimal mesa-dri xorg-server-xwayland lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center dconf; do
+        for pkg in dbus elogind NetworkManager xorg-minimal mesa-dri xorg-server-xwayland gnome-terminal lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center dconf; do
             sudo xbps-install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
