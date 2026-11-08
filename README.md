@@ -84,7 +84,7 @@ cd cinnamon-config
 chmod +x install.sh
 ```
 
-``` For nixos
+...For nixos
 ```bash
 chmod +x nix.sh
 ```
@@ -95,7 +95,7 @@ chmod +x nix.sh
 ./install.sh
 ```
 
-``` For nixos
+...For nixos
 ```bash
 ./nix.sh
 ```
