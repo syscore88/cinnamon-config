@@ -84,13 +84,24 @@ cd cinnamon-config
 chmod +x install.sh
 ```
 
+``` For nixos
+```bash
+chmod +x nix.sh
+```
+
 4. Run the script
 > ⚠️ **IMPORTANT:** Run the script as a **regular user** (NOT as root/sudo). The script will ask for the administrator password at the start to configure temporary elevated privileges.
-
 ```bash
 ./install.sh
 ```
+
+``` For nixos
+```bash
+./nix.sh
+```
+
 ---
+
 <img width="1280" height="800" alt="Screenshot_archlinux_2026-09-15_22:44:06" src="https://github.com/user-attachments/assets/c16c649e-cdf1-4c65-8dc1-b3d90d267ba2" />
 
 
