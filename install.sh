@@ -288,11 +288,7 @@ install_cinnamon_packages() {
     else
         log_warn "Nierozpoznana dystrybucja ($OS) - pomijam instalację pakietów Cinnamon. Zainstaluj ręcznie: cinnamon-control-center, dconf-cli/dconf." \
                  "Unrecognized distribution ($OS) - skipping Cinnamon package installation. Install manually: cinnamon-control-center, dconf-cli/dconf."
-    fi
-
-    if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
-        log_warn "Nie udało się zainstalować: ${FAILED_PACKAGES[*]}. Sprawdź log: $LOG_FILE" \
-                 "Failed to install: ${FAILED_PACKAGES[*]}. Check the log: $LOG_FILE"
+        FAILED_PACKAGES+=(cinnamon-control-center dconf)
     fi
 }
 
@@ -301,16 +297,27 @@ install_cinnamon_packages() {
 # ==========================================================
 install_spices_dependencies() {
     wait_for_pkg_lock
+    local pkg
     if [[ "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
-        sudo apt-get install -yq curl unzip || true
+        for pkg in curl unzip; do
+            sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     elif [[ "$OS_LIKE" == *"fedora"* ]]; then
-        sudo dnf install -yq curl unzip || true
+        for pkg in curl unzip; do
+            sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     elif [[ "$OS_LIKE" == *"arch"* ]]; then
-        sudo pacman -S --noconfirm --needed curl unzip || true
+        for pkg in curl unzip; do
+            sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     elif [[ "$OS_LIKE" == *"suse"* ]]; then
-        sudo zypper install -yqn curl unzip || true
+        for pkg in curl unzip; do
+            sudo zypper install -yqn "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     elif [[ "$OS_LIKE" == *"void"* ]]; then
-        sudo xbps-install -y curl unzip || true
+        for pkg in curl unzip; do
+            sudo xbps-install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
+        done
     fi
 }
 
@@ -357,11 +364,6 @@ install_all_cinnamon_spices() {
     for uuid in "${CINNAMON_EXTENSIONS[@]}"; do
         install_cinnamon_spice "extensions" "$uuid"
     done
-
-    if [[ ${#FAILED_SPICES[@]} -gt 0 ]]; then
-        log_warn "Nie udało się pobrać apletów/rozszerzeń: ${FAILED_SPICES[*]}. Sprawdź log: $LOG_FILE" \
-                 "Failed to download applets/extensions: ${FAILED_SPICES[*]}. Check the log: $LOG_FILE"
-    fi
 }
 
 detect_os
@@ -829,6 +831,16 @@ show_progress 12 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 show_progress 13 $TOTAL_STEPS "$MSG_FINALIZE"
 printf '\n\n' >&3
+
+if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
+    log_warn "Nie udało się zainstalować: ${FAILED_PACKAGES[*]}. Sprawdź log: $LOG_FILE" \
+             "Failed to install: ${FAILED_PACKAGES[*]}. Check the log: $LOG_FILE"
+fi
+
+if [[ ${#FAILED_SPICES[@]} -gt 0 ]]; then
+    log_warn "Nie udało się pobrać apletów/rozszerzeń: ${FAILED_SPICES[*]}. Sprawdź log: $LOG_FILE" \
+             "Failed to download applets/extensions: ${FAILED_SPICES[*]}. Check the log: $LOG_FILE"
+fi
 
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
     echo -e "${SUCCESS}[OK] KONFIGURACJA WIZUALNA ZAKOŃCZONA!${NC}" >&3
