@@ -282,7 +282,7 @@ install_cinnamon_packages() {
         done
     elif [[ "$OS_LIKE" == *"void"* ]]; then
         sudo xbps-install -Suy xbps || true
-        for pkg in dbus elogind NetworkManager network-manager-applet pipewire-PulseAudio btop xorg-minimal mesa-dri xorg-server-xwayland gnome-terminal lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center fontconfig font-adobe-source-sans-pro font-util Liberation-fonts ttf-dejavu ttf-ubuntu-font-family font-awesome dejavu-fonts-ttf noto-fonts-ttf noto-fonts-emoji adwaita-icon-theme xdg-user-dirs pavucontrol pix xed xreader xviewer ffmpegthumbnailer poppler-glib tumbler engrampa gvfs gvfs-afc gvfs-smb udisks2 polkit-gnome dconf; do
+        for pkg in dbus elogind NetworkManager network-manager-applet pulseaudio-utils rtkit btop xorg-minimal mesa-dri xorg-server-xwayland gnome-terminal lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center fontconfig font-adobe-source-sans-pro font-util Liberation-fonts ttf-dejavu ttf-ubuntu-font-family font-awesome dejavu-fonts-ttf noto-fonts-ttf noto-fonts-emoji adwaita-icon-theme xdg-user-dirs pavucontrol pix xed xreader xviewer ffmpegthumbnailer poppler-glib tumbler engrampa gvfs gvfs-afc gvfs-smb udisks2 polkit-gnome dconf; do
             sudo xbps-install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
