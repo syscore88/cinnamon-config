@@ -269,15 +269,15 @@ let
     "unzip"
   ];
   try = v: let r = builtins.tryEval v; in if r.success then r.value else null;
+  usable = p: (try (p != null && lib.isDerivation p && !(p.meta.broken or false))) == true;
   lookup = n:
     let
       top = try (pkgs.\${n} or null);
       sub = try (pkgs.cinnamon.\${n} or null);
     in
-      if lib.isDerivation top then top
-      else if lib.isDerivation sub then sub
+      if usable top then top
+      else if usable sub then sub
       else null;
-  usable = p: p != null && !(p.meta.broken or false);
 in
 {
   environment.systemPackages = lib.filter usable (map lookup packageNames);
@@ -304,7 +304,6 @@ if ! sudo grep -Eq '^[[:space:]]*[^#]*cinnamon-visual\.nix' "$NIXOS_CONF"; then
     fi
 fi
 
-# Obsługa NixOS Flakes (dodanie nowych plików do indeksu Git bez commitowania)
 if [[ -d "$NIXOS_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
     sudo git -C "$NIXOS_DIR" add -N cinnamon-visual.nix 2>/dev/null || true
     if [[ "$HAS_LOGIN_WALLPAPER" -eq 1 ]]; then
@@ -428,15 +427,6 @@ fi
 
 show_progress 5 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
-# Wybór nazwy motywu McMojave
-THEME_NAME="McMojave"
-if [[ ! -d "$HOME/.themes/McMojave" && ! -d "/usr/share/themes/McMojave" ]]; then
-    if [[ -d "$HOME/.themes/Mojave-Dark" || -d "/usr/share/themes/Mojave-Dark" ]]; then
-        THEME_NAME="Mojave-Dark"
-    fi
-fi
-
-# Budowanie list włączonych apletów i rozszerzeń (tylko zainstalowane spices)
 ENABLED_APPLETS_LIST=(
     "'panel1:left:0:menu@cinnamon.org:0'"
     "'panel1:left:1:separator@cinnamon.org:1'"
@@ -485,7 +475,6 @@ if command -v dconf >/dev/null 2>&1; then
     mkdir -p "$HOME/.config/dconf"
 
     sed \
-        -e "s|__THEME_NAME__|${THEME_NAME}|g" \
         -e "s|__ENABLED_APPLETS__|${ENABLED_APPLETS_DCONF}|g" \
         -e "s|__ENABLED_EXTENSIONS__|${ENABLED_EXTENSIONS_DCONF}|g" \
         <<'DCONF_EOF' | ${DBUS_WRAP[@]+"${DBUS_WRAP[@]}"} dconf load / || true
@@ -512,7 +501,7 @@ sources=[('xkb', 'pl')]
 clock-show-date=true
 clock-show-seconds=true
 cursor-theme='McMojave-Cursors'
-gtk-theme='__THEME_NAME__'
+gtk-theme='Mojave-Dark'
 icon-theme='kora'
 toolkit-accessibility=false
 
@@ -548,7 +537,7 @@ draggable-border-width=10
 night-light-last-coordinates=(52.25, 21.0)
 
 [org/cinnamon/theme]
-name='__THEME_NAME__'
+name='Mojave-Dark'
 
 [org/gnome/desktop/a11y/applications]
 screen-reader-enabled=false
@@ -582,7 +571,7 @@ gtk-im-module=''
 gtk-im-preedit-style='callback'
 gtk-im-status-style='callback'
 gtk-key-theme='Default'
-gtk-theme='__THEME_NAME__'
+gtk-theme='Mojave-Dark'
 gtk-timeout-initial=200
 gtk-timeout-repeat=20
 icon-theme='kora'
@@ -635,7 +624,7 @@ mouse-button-modifier='<Alt>'
 num-workspaces=4
 raise-on-click=true
 resize-with-right-button=true
-theme='__THEME_NAME__'
+theme='Mojave-Dark'
 titlebar-font='Ubuntu Medium 10'
 titlebar-uses-system-font=false
 visual-bell=false

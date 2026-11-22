@@ -451,15 +451,6 @@ fi
 
 show_progress 6 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
-# Wybór nazwy motywu McMojave
-THEME_NAME="McMojave"
-if [[ ! -d "$HOME/.themes/McMojave" && ! -d "/usr/share/themes/McMojave" ]]; then
-    if [[ -d "$HOME/.themes/Mojave-Dark" || -d "/usr/share/themes/Mojave-Dark" ]]; then
-        THEME_NAME="Mojave-Dark"
-    fi
-fi
-
-# Budowanie list włączonych apletów i rozszerzeń (tylko zainstalowane spices)
 ENABLED_APPLETS_LIST=(
     "'panel1:left:0:menu@cinnamon.org:0'"
     "'panel1:left:1:separator@cinnamon.org:1'"
@@ -508,7 +499,6 @@ if command -v dconf &>/dev/null; then
     mkdir -p "$HOME/.config/dconf"
 
     sed \
-        -e "s|__THEME_NAME__|${THEME_NAME}|g" \
         -e "s|__ENABLED_APPLETS__|${ENABLED_APPLETS_DCONF}|g" \
         -e "s|__ENABLED_EXTENSIONS__|${ENABLED_EXTENSIONS_DCONF}|g" \
         <<'DCONF_EOF' | ${DBUS_WRAP[@]+"${DBUS_WRAP[@]}"} dconf load / || true
@@ -535,7 +525,7 @@ sources=[('xkb', 'pl')]
 clock-show-date=true
 clock-show-seconds=true
 cursor-theme='McMojave-Cursors'
-gtk-theme='__THEME_NAME__'
+gtk-theme='Mojave-Dark'
 icon-theme='kora'
 toolkit-accessibility=false
 
@@ -571,7 +561,7 @@ draggable-border-width=10
 night-light-last-coordinates=(52.25, 21.0)
 
 [org/cinnamon/theme]
-name='__THEME_NAME__'
+name='Mojave-Dark'
 
 [org/gnome/desktop/a11y/applications]
 screen-reader-enabled=false
@@ -605,7 +595,7 @@ gtk-im-module=''
 gtk-im-preedit-style='callback'
 gtk-im-status-style='callback'
 gtk-key-theme='Default'
-gtk-theme='__THEME_NAME__'
+gtk-theme='Mojave-Dark'
 gtk-timeout-initial=200
 gtk-timeout-repeat=20
 icon-theme='kora'
@@ -658,7 +648,7 @@ mouse-button-modifier='<Alt>'
 num-workspaces=4
 raise-on-click=true
 resize-with-right-button=true
-theme='__THEME_NAME__'
+theme='Mojave-Dark'
 titlebar-font='Ubuntu Medium 10'
 titlebar-uses-system-font=false
 visual-bell=false
