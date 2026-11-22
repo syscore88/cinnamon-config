@@ -32,6 +32,8 @@ exec >>"$TMP_LOG" 2>&1
 
 cleanup_on_exit() {
     local exit_code=$?
+    set +e
+    trap - ERR
     [ -n "${SUDO_KEEPALIVE_PID:-}" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
     printf '\033[?7h' >&3
     if [ "$exit_code" -ne 0 ] || [ "${#FAILED_SPICES[@]}" -gt 0 ]; then
@@ -55,10 +57,10 @@ cleanup_on_exit() {
     local do_reboot=0
     [ "$exit_code" -eq 0 ] && [ "${DO_REBOOT:-0}" = "1" ] && do_reboot=1
     if [ "${SUDO_READY:-0}" = "1" ]; then
-        sudo sh -c 'rm -f "$1" "$2"; systemctl try-restart polkit 2>/dev/null; [ "$3" = 1 ] && systemctl reboot' _ \
+        sudo sh -c 'rm -f "$1" "$2"; systemctl try-restart polkit 2>/dev/null || true; if [ "$3" = 1 ]; then systemctl reboot 2>/dev/null || reboot; fi' _ \
             "${RUN0_NOPASSWD_FILE:-/etc/polkit-1/rules.d/51-run0-nopasswd.rules}" \
             "/etc/sudoers.d/99-temp-installer" \
-            "$do_reboot"
+            "$do_reboot" || true
     fi
 }
 trap cleanup_on_exit EXIT
@@ -66,7 +68,7 @@ trap cleanup_on_exit EXIT
 _pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
 _log_write() {
     echo -e "$1"
-    echo -e "$1" >&3
+    printf '\r\033[K%b\n' "$1" >&3
     cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
 }
 log_info()  { local m; m="$(_pick_msg "$1" "$2")"; _log_write "${INFO}==> $m${NC}"; }
@@ -146,15 +148,16 @@ fi
 # ==========================================
 RUN0_NOPASSWD_FILE="/etc/polkit-1/rules.d/51-run0-nopasswd.rules"
 USE_RUN0=0
-if ! command -v visudo >/dev/null 2>&1; then
-    USE_RUN0=1
-elif command -v run0 >/dev/null 2>&1 && sudo --version 2>/dev/null | grep -qi "run0"; then
-    USE_RUN0=1
+if command -v run0 >/dev/null 2>&1; then
+    if ! command -v visudo >/dev/null 2>&1 || sudo --version 2>/dev/null | grep -qi "run0"; then
+        USE_RUN0=1
+    fi
 fi
 
 printf '\033[?7h' >&3
 SUDO_READY=0
 if [[ "$USE_RUN0" -eq 1 ]]; then
+    sudo mkdir -p "$(dirname "$RUN0_NOPASSWD_FILE")"
     sudo tee "$RUN0_NOPASSWD_FILE" > /dev/null <<POLKIT_RULE_EOF
 polkit.addRule(function(action, subject) {
     if (subject.user == "$CURRENT_USER") {
@@ -178,17 +181,19 @@ else
     ) &
     SUDO_KEEPALIVE_PID=$!
 
-    SUDOERS_TMP="$(mktemp)"
-    echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_TMP"
-    if sudo visudo -cf "$SUDOERS_TMP" >/dev/null; then
-        sudo mkdir -p /etc/sudoers.d
-        sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
-    else
+    if command -v visudo >/dev/null 2>&1 && sudo grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
+        SUDOERS_TMP="$(mktemp)"
+        echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_TMP"
+        if sudo visudo -cf "$SUDOERS_TMP" >/dev/null; then
+            sudo mkdir -p /etc/sudoers.d
+            sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
+        else
+            rm -f "$SUDOERS_TMP"
+            log_err "Nieprawidłowa składnia reguły sudoers - przerywam." "Invalid sudoers rule syntax - aborting."
+            exit 1
+        fi
         rm -f "$SUDOERS_TMP"
-        log_err "Nieprawidłowa składnia reguły sudoers - przerywam." "Invalid sudoers rule syntax - aborting."
-        exit 1
     fi
-    rm -f "$SUDOERS_TMP"
     SUDO_READY=1
 fi
 
@@ -209,38 +214,46 @@ if [[ ! -f "$NIXOS_CONF" ]]; then
 fi
 
 if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
-    cp -af "$SCRIPT_DIR/piwo.png" "$HOME/.face" 2>/dev/null || true
-    chmod 644 "$HOME/.face" 2>/dev/null || true
+    install -m 644 "$SCRIPT_DIR/piwo.png" "$HOME/.face" 2>/dev/null || true
 
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
     ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
 
-    sudo mkdir -p /var/lib/AccountsService/icons/ /var/lib/AccountsService/users/ || true
-    sudo cp -f "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" || true
-    sudo chmod 644 "$AVATAR_DEST" || true
+    sudo mkdir -p /var/lib/AccountsService/icons /var/lib/AccountsService/users || true
+    sudo install -m 644 -o root -g root "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" || true
 
     if [[ ! -f "$ACCOUNTS_FILE" ]]; then
-        echo -e "[User]\nIcon=$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null
+        printf '[User]\nIcon=%s\n' "$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null
     elif sudo grep -q "^Icon=" "$ACCOUNTS_FILE"; then
         sudo sed -i "s|^Icon=.*|Icon=$AVATAR_DEST|" "$ACCOUNTS_FILE" || true
     elif sudo grep -q "^\[User\]" "$ACCOUNTS_FILE"; then
         sudo sed -i "/^\[User\]/a Icon=$AVATAR_DEST" "$ACCOUNTS_FILE" || true
     else
-        echo "Icon=$AVATAR_DEST" | sudo tee -a "$ACCOUNTS_FILE" > /dev/null
+        printf '\n[User]\nIcon=%s\n' "$AVATAR_DEST" | sudo tee -a "$ACCOUNTS_FILE" > /dev/null
     fi
 
     sudo systemctl restart accounts-daemon 2>/dev/null || true
 fi
 
 LOGIN_WALLPAPER_NIX="# brak"
+HAS_LOGIN_WALLPAPER=0
 if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     sudo install -m 644 -o root -g root "$SCRIPT_DIR/login-wallpaper.png" "$NIXOS_DIR/login-wallpaper.png"
-    LOGIN_WALLPAPER_NIX='services.xserver.displayManager.lightdm.background = lib.mkForce ./login-wallpaper.png;
+    HAS_LOGIN_WALLPAPER=1
+    LOGIN_WALLPAPER_NIX='services.xserver.displayManager.lightdm.background =
+    lib.mkIf (config.services.xserver.displayManager.lightdm.enable or false) (lib.mkForce ./login-wallpaper.png);
 
-  services.xserver.displayManager.lightdm.greeters.slick.extraConfig = '"''"'
-    background=${./login-wallpaper.png}
-    draw-user-backgrounds=false
-  '"''"';'
+  services.xserver.displayManager.lightdm.greeters.slick.extraConfig =
+    lib.mkIf ((config.services.xserver.displayManager.lightdm.enable or false) && (config.services.xserver.displayManager.lightdm.greeters.slick.enable or false)) (lib.mkAfter '"''"'
+      background=${./login-wallpaper.png}
+      draw-user-backgrounds=false
+    '"''"');
+
+  services.xserver.displayManager.lightdm.greeters.gtk.extraConfig =
+    lib.mkIf ((config.services.xserver.displayManager.lightdm.enable or false) && (config.services.xserver.displayManager.lightdm.greeters.gtk.enable or false)) (lib.mkAfter '"''"'
+      background=${./login-wallpaper.png}
+      user-background=false
+    '"''"');'
 fi
 
 CINNAMON_MODULE_TMP="$(mktemp)"
@@ -251,6 +264,7 @@ let
   packageNames = [
     "cinnamon-control-center"
     "dconf"
+    "glib"
     "curl"
     "unzip"
   ];
@@ -278,13 +292,23 @@ sudo install -m 644 -o root -g root "$CINNAMON_MODULE_TMP" "$CINNAMON_MODULE"
 rm -f "$CINNAMON_MODULE_TMP"
 
 sudo cp -f "$NIXOS_CONF" "$NIXOS_CONF.bak"
-if ! sudo grep -q "cinnamon-visual.nix" "$NIXOS_CONF"; then
-    if sudo grep -q "\./hardware-configuration\.nix" "$NIXOS_CONF"; then
-        sudo sed -i 's|\./hardware-configuration\.nix|& ./cinnamon-visual.nix|' "$NIXOS_CONF"
-    else
+if ! sudo grep -Eq '^[[:space:]]*[^#]*cinnamon-visual\.nix' "$NIXOS_CONF"; then
+    if sudo grep -Eq '^[[:space:]]*[^#]*\./hardware-configuration\.nix' "$NIXOS_CONF"; then
+        sudo sed -i '/^[[:space:]]*#/! s|\./hardware-configuration\.nix|& ./cinnamon-visual.nix|' "$NIXOS_CONF"
+    fi
+    if ! sudo grep -Eq '^[[:space:]]*[^#]*cinnamon-visual\.nix' "$NIXOS_CONF"; then
+        sudo cp -f "$NIXOS_CONF.bak" "$NIXOS_CONF"
         log_err "Nie można dodać ./cinnamon-visual.nix do imports w $NIXOS_CONF - dodaj ręcznie." \
                 "Cannot add ./cinnamon-visual.nix to imports in $NIXOS_CONF - add it manually."
         exit 1
+    fi
+fi
+
+# Obsługa NixOS Flakes (dodanie nowych plików do indeksu Git bez commitowania)
+if [[ -d "$NIXOS_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    sudo git -C "$NIXOS_DIR" add -N cinnamon-visual.nix 2>/dev/null || true
+    if [[ "$HAS_LOGIN_WALLPAPER" -eq 1 ]]; then
+        sudo git -C "$NIXOS_DIR" add -N login-wallpaper.png 2>/dev/null || true
     fi
 fi
 
@@ -361,13 +385,13 @@ safe_copy_dir() {
     return 0
 }
 
-safe_copy_dir "$SCRIPT_DIR/.config" ~/.config
-safe_copy_dir "$SCRIPT_DIR/.local" ~/.local
-safe_copy_dir "$SCRIPT_DIR/.icons" ~/.icons
-safe_copy_dir "$SCRIPT_DIR/.themes" ~/.themes
+safe_copy_dir "$SCRIPT_DIR/.config" "$HOME/.config"
+safe_copy_dir "$SCRIPT_DIR/.local" "$HOME/.local"
+safe_copy_dir "$SCRIPT_DIR/.icons" "$HOME/.icons"
+safe_copy_dir "$SCRIPT_DIR/.themes" "$HOME/.themes"
 
 if [[ -f "$SCRIPT_DIR/wallpaper.jpg" ]]; then
-    mkdir -p "$(dirname "$wallpaper_PATH")" 2>/dev/null
+    mkdir -p "$(dirname "$wallpaper_PATH")" 2>/dev/null || true
     cp -af "$SCRIPT_DIR/wallpaper.jpg" "$wallpaper_PATH" 2>/dev/null || true
 fi
 
@@ -382,7 +406,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
     SESSION_PID=$(pgrep -u "$CURRENT_USER" cinnamon-session | head -n 1 || true)
     if [[ -n "$SESSION_PID" ]]; then
         DBUS_ADDR_FROM_ENVIRON="$(grep -z DBUS_SESSION_BUS_ADDRESS "/proc/$SESSION_PID/environ" 2>/dev/null | tr '\0' '\n' | grep ^DBUS_SESSION_BUS_ADDRESS= | cut -d= -f2- || true)"
-        export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR_FROM_ENVIRON"
+        [[ -n "$DBUS_ADDR_FROM_ENVIRON" ]] && export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR_FROM_ENVIRON"
     fi
 fi
 if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
@@ -392,24 +416,86 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
     fi
 fi
 
+DBUS_WRAP=()
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v dbus-run-session >/dev/null 2>&1; then
+    DBUS_WRAP=(dbus-run-session --)
+fi
+
 if command -v gsettings >/dev/null 2>&1; then
-    gsettings set org.cinnamon.desktop.background picture-uri "file://$wallpaper_PATH" 2>/dev/null \
-        && gsettings set org.cinnamon.desktop.background picture-options "zoom" 2>/dev/null || true
+    ${DBUS_WRAP[@]+"${DBUS_WRAP[@]}"} gsettings set org.cinnamon.desktop.background picture-uri "file://$wallpaper_PATH" 2>/dev/null \
+        && ${DBUS_WRAP[@]+"${DBUS_WRAP[@]}"} gsettings set org.cinnamon.desktop.background picture-options "zoom" 2>/dev/null || true
 fi
 
 show_progress 5 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
+# Wybór nazwy motywu McMojave
+THEME_NAME="McMojave"
+if [[ ! -d "$HOME/.themes/McMojave" && ! -d "/usr/share/themes/McMojave" ]]; then
+    if [[ -d "$HOME/.themes/Mojave-Dark" || -d "/usr/share/themes/Mojave-Dark" ]]; then
+        THEME_NAME="Mojave-Dark"
+    fi
+fi
+
+# Budowanie list włączonych apletów i rozszerzeń (tylko zainstalowane spices)
+ENABLED_APPLETS_LIST=(
+    "'panel1:left:0:menu@cinnamon.org:0'"
+    "'panel1:left:1:separator@cinnamon.org:1'"
+    "'panel1:left:2:grouped-window-list@cinnamon.org:2'"
+    "'panel1:right:3:systray@cinnamon.org:3'"
+    "'panel1:right:4:xapp-status@cinnamon.org:4'"
+    "'panel1:right:5:notifications@cinnamon.org:5'"
+    "'panel1:right:6:printers@cinnamon.org:6'"
+    "'panel1:right:7:removable-drives@cinnamon.org:7'"
+    "'panel1:right:8:keyboard@cinnamon.org:8'"
+    "'panel1:right:9:favorites@cinnamon.org:9'"
+    "'panel1:right:10:network@cinnamon.org:10'"
+    "'panel1:right:11:sound@cinnamon.org:11'"
+    "'panel1:right:12:power@cinnamon.org:12'"
+    "'panel1:right:14:calendar@cinnamon.org:13'"
+    "'panel1:right:18:cornerbar@cinnamon.org:14'"
+)
+[[ -d "$HOME/.local/share/cinnamon/applets/weather@mockturtl" ]] && ENABLED_APPLETS_LIST+=("'panel1:right:15:weather@mockturtl:15'")
+[[ -d "$HOME/.local/share/cinnamon/applets/sticky@scollins" ]] && ENABLED_APPLETS_LIST+=("'panel1:right:2:sticky@scollins:16'")
+[[ -d "$HOME/.local/share/cinnamon/applets/download-and-upload-speed@cardsurf" ]] && ENABLED_APPLETS_LIST+=("'panel1:right:13:download-and-upload-speed@cardsurf:17'")
+[[ -d "$HOME/.local/share/cinnamon/applets/ScreenShot@tech71" ]] && ENABLED_APPLETS_LIST+=("'panel1:right:17:ScreenShot@tech71:18'")
+[[ -d "$HOME/.local/share/cinnamon/applets/spicy-clipboard-applet@Twilight0" ]] && ENABLED_APPLETS_LIST+=("'panel1:right:0:spicy-clipboard-applet@Twilight0:20'")
+
+ENABLED_EXTENSIONS_LIST=()
+for ext_uuid in "transparent-panels@germanfr" "compiz-windows-effect@hermes83.github.com" "CinnamonBurnMyWindows@klangman"; do
+    [[ -d "$HOME/.local/share/cinnamon/extensions/$ext_uuid" ]] && ENABLED_EXTENSIONS_LIST+=("'$ext_uuid'")
+done
+
+join_dconf_array() {
+    local out="" item
+    for item in "$@"; do
+        [[ -n "$out" ]] && out+=", "
+        out+="$item"
+    done
+    printf '[%s]' "$out"
+}
+
+ENABLED_APPLETS_DCONF="$(join_dconf_array "${ENABLED_APPLETS_LIST[@]}")"
+if [[ ${#ENABLED_EXTENSIONS_LIST[@]} -gt 0 ]]; then
+    ENABLED_EXTENSIONS_DCONF="$(join_dconf_array "${ENABLED_EXTENSIONS_LIST[@]}")"
+else
+    ENABLED_EXTENSIONS_DCONF="@as []"
+fi
+
 if command -v dconf >/dev/null 2>&1; then
     mkdir -p "$HOME/.config/dconf"
 
-    dconf load / <<'DCONF_EOF' || true
+    sed \
+        -e "s|__THEME_NAME__|${THEME_NAME}|g" \
+        -e "s|__ENABLED_APPLETS__|${ENABLED_APPLETS_DCONF}|g" \
+        -e "s|__ENABLED_EXTENSIONS__|${ENABLED_EXTENSIONS_DCONF}|g" \
+        <<'DCONF_EOF' | ${DBUS_WRAP[@]+"${DBUS_WRAP[@]}"} dconf load / || true
 [org/cinnamon]
 alttab-switcher-delay=100
 desktop-effects-close='fly'
 desktop-effects-map='traditional'
 desktop-effects-minimize='fade'
-enabled-applets=['panel1:left:0:menu@cinnamon.org:0', 'panel1:left:1:separator@cinnamon.org:1', 'panel1:left:2:grouped-window-list@cinnamon.org:2', 'panel1:right:3:systray@cinnamon.org:3', 'panel1:right:4:xapp-status@cinnamon.org:4', 'panel1:right:5:notifications@cinnamon.org:5', 'panel1:right:6:printers@cinnamon.org:6', 'panel1:right:7:removable-drives@cinnamon.org:7', 'panel1:right:8:keyboard@cinnamon.org:8', 'panel1:right:9:favorites@cinnamon.org:9', 'panel1:right:10:network@cinnamon.org:10', 'panel1:right:11:sound@cinnamon.org:11', 'panel1:right:12:power@cinnamon.org:12', 'panel1:right:14:calendar@cinnamon.org:13', 'panel1:right:18:cornerbar@cinnamon.org:14', 'panel1:right:15:weather@mockturtl:15', 'panel1:right:2:sticky@scollins:16', 'panel1:right:13:download-and-upload-speed@cardsurf:17', 'panel1:right:17:ScreenShot@tech71:18', 'panel1:right:0:spicy-clipboard-applet@Twilight0:20']
-enabled-extensions=['transparent-panels@germanfr', 'compiz-windows-effect@hermes83.github.com', 'CinnamonBurnMyWindows@klangman']
+enabled-applets=__ENABLED_APPLETS__
+enabled-extensions=__ENABLED_EXTENSIONS__
 next-applet-id=21
 no-adjacent-panel-barriers=true
 panel-edit-mode=false
@@ -426,7 +512,7 @@ sources=[('xkb', 'pl')]
 clock-show-date=true
 clock-show-seconds=true
 cursor-theme='McMojave-Cursors'
-gtk-theme='Mojave-Dark'
+gtk-theme='__THEME_NAME__'
 icon-theme='kora'
 toolkit-accessibility=false
 
@@ -462,7 +548,7 @@ draggable-border-width=10
 night-light-last-coordinates=(52.25, 21.0)
 
 [org/cinnamon/theme]
-name='Mojave-Dark'
+name='__THEME_NAME__'
 
 [org/gnome/desktop/a11y/applications]
 screen-reader-enabled=false
@@ -486,7 +572,7 @@ cursor-blink=true
 cursor-blink-time=1200
 cursor-blink-timeout=10
 cursor-size=24
-cursor-theme='Yaru'
+cursor-theme='McMojave-Cursors'
 enable-animations=true
 font-name='Ubuntu 10'
 gtk-color-palette='black:white:gray50:red:purple:blue:light blue:green:yellow:orange:lavender:brown:goldenrod4:dodger blue:pink:light green:gray10:gray30:gray75:gray90'
@@ -496,10 +582,10 @@ gtk-im-module=''
 gtk-im-preedit-style='callback'
 gtk-im-status-style='callback'
 gtk-key-theme='Default'
-gtk-theme='Mojave-Dark'
+gtk-theme='__THEME_NAME__'
 gtk-timeout-initial=200
 gtk-timeout-repeat=20
-icon-theme='WhiteSur-dark'
+icon-theme='kora'
 menubar-accel='F10'
 menubar-detachable=false
 menus-have-tearoff=false
@@ -549,7 +635,7 @@ mouse-button-modifier='<Alt>'
 num-workspaces=4
 raise-on-click=true
 resize-with-right-button=true
-theme='Mint-Y'
+theme='__THEME_NAME__'
 titlebar-font='Ubuntu Medium 10'
 titlebar-uses-system-font=false
 visual-bell=false
@@ -567,27 +653,33 @@ disabled-gtk-modules=@as []
 enabled-gtk-modules=@as []
 overrides=@a{sv} {}
 
+[org/gnome/terminal/legacy]
+theme-variant='dark'
+default-show-menubar=false
+
 [org/gnome/terminal/legacy/profiles:]
+default='b1dcc9dd-5262-4d8d-a863-c897e6d979b9'
 list=['b1dcc9dd-5262-4d8d-a863-c897e6d979b9']
 
 [org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9]
 audible-bell=true
+background-color='rgb(0,0,0)'
 background-transparency-percent=21
 bold-color='rgb(104,16,16)'
 bold-color-same-as-fg=false
 cursor-background-color='rgb(112,229,0)'
 cursor-blink-mode='on'
 cursor-colors-set=true
-cursor-foreground-color='rgb(212,255,0)'
+cursor-foreground-color='rgb(12,18,234)'
 cursor-shape='block'
-foreground-color='rgb(19,109,207)'
+foreground-color='rgb(20,219,138)'
 highlight-colors-set=true
 highlight-foreground-color='rgb(193,49,184)'
 palette=['rgb(0,0,0)', 'rgb(205,0,0)', 'rgb(0,205,0)', 'rgb(205,205,0)', 'rgb(0,0,238)', 'rgb(172,37,172)', 'rgb(0,205,205)', 'rgb(229,229,229)', 'rgb(127,127,127)', 'rgb(255,0,0)', 'rgb(0,255,0)', 'rgb(255,255,0)', 'rgb(92,92,255)', 'rgb(255,0,255)', 'rgb(0,255,255)', 'rgb(255,255,255)']
 use-theme-colors=false
 use-theme-transparency=false
 use-transparent-background=true
-visible-name='xd'
+visible-name='user'
 
 [org/gtk/settings/color-chooser]
 custom-colors=[(0.4387943262411349, 0.89666666666666672, 0.0, 1.0), (0.82978723404255317, 1.0, 0.0, 1.0), (0.23921568627450981, 0.792156862745098, 0.090196078431372548, 1.0), (0.240156634304207, 0.79333333333333333, 0.089911111111111081, 1.0), (0.20392156862745098, 0.52156862745098043, 0.11764705882352941, 1.0), (0.1803921568627451, 0.20392156862745098, 0.21176470588235294, 1.0), (0.80392156862745101, 0.80392156862745101, 0.0, 1.0), (0.67333333333333334, 0.1458888888888889, 0.67333333333333334, 1.0)]
@@ -636,18 +728,6 @@ side-panel-active-page=-1725528251
 side-panel-size=200
 size=(650, 500)
 state=87168
-
-[org/gnome/terminal/legacy]
-theme-variant='dark'
-default-show-menubar=false
-
-[org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9]
-background-color='rgb(0,0,0)'
-cursor-colors-set=true
-cursor-foreground-color='rgb(12,18,234)'
-foreground-color='rgb(20,219,138)'
-use-theme-colors=false
-visible-name='user'
 
 [org/x/warpinator/preferences]
 ask-for-send-permission=true
