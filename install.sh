@@ -285,11 +285,11 @@ install_cinnamon_packages() {
     wait_for_pkg_lock
     if [[ "$OS_LIKE" == *"ubuntu"* || "$OS_LIKE" == *"debian"* ]]; then
         sudo apt-get update -yq || true
-        for pkg in cinnamon-control-center dconf-cli; do
+        for pkg in accountsservice cinnamon-control-center dconf-cli; do
             sudo apt-get install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS_LIKE" == *"fedora"* ]]; then
-        for pkg in cinnamon-control-center dconf; do
+        for pkg in accountsservice cinnamon-control-center dconf; do
             sudo dnf install -yq "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS_LIKE" == *"arch"* ]]; then
@@ -297,12 +297,12 @@ install_cinnamon_packages() {
             sudo pacman -S --noconfirm --needed "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS_LIKE" == *"suse"* ]]; then
-        for pkg in cinnamon-control-center dconf; do
+        for pkg in accountsservice cinnamon-control-center dconf; do
             sudo zypper -nq install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     elif [[ "$OS_LIKE" == *"void"* ]]; then
         sudo xbps-install -Suy xbps || true
-        for pkg in dbus elogind NetworkManager network-manager-applet pulseaudio-utils rtkit btop xorg-minimal mesa-dri xorg-server-xwayland gnome-terminal lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center fontconfig font-adobe-source-sans-pro font-util liberation-fonts-ttf ttf-ubuntu-font-family font-awesome dejavu-fonts-ttf noto-fonts-ttf noto-fonts-emoji adwaita-icon-theme xdg-user-dirs pavucontrol pix xed xreader xviewer ffmpegthumbnailer poppler-glib tumbler engrampa gvfs gvfs-afc gvfs-smb udisks2 polkit-gnome dconf; do
+        for pkg in dbus elogind accountsservice NetworkManager network-manager-applet pulseaudio-utils rtkit btop xorg-minimal mesa-dri xorg-server-xwayland gnome-terminal lightdm lightdm-gtk3-greeter cinnamon cinnamon-control-center fontconfig font-adobe-source-sans-pro font-util liberation-fonts-ttf ttf-ubuntu-font-family font-awesome dejavu-fonts-ttf noto-fonts-ttf noto-fonts-emoji adwaita-icon-theme xdg-user-dirs pavucontrol pix xed xreader xviewer ffmpegthumbnailer poppler-glib tumbler engrampa gvfs gvfs-afc gvfs-smb udisks2 polkit-gnome dconf; do
             sudo xbps-install -y "$pkg" || FAILED_PACKAGES+=("$pkg")
         done
     else
@@ -753,15 +753,13 @@ fi
 show_progress 7 $TOTAL_STEPS "$MSG_OPTIMIZE"
 
 if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
-    install -m 644 "$SCRIPT_DIR/piwo.png" "$HOME/.face" 2>/dev/null || true
-
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
     ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
 
     sudo mkdir -p /var/lib/AccountsService/icons /var/lib/AccountsService/users || true
     sudo install -m 644 -o root -g root "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" || true
 
-    if [[ ! -f "$ACCOUNTS_FILE" ]]; then
+    if ! sudo test -f "$ACCOUNTS_FILE"; then
         printf '[User]\nIcon=%s\n' "$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null
     elif sudo grep -q "^Icon=" "$ACCOUNTS_FILE"; then
         sudo sed -i "s|^Icon=.*|Icon=$AVATAR_DEST|" "$ACCOUNTS_FILE" || true
